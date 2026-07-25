@@ -12,7 +12,6 @@ def fetch_property_data():
         print(f"Error: {INPUT_FILE} not found.")
         return
 
-    # Prepare to write the master output file
     headers = [
         "Block", "Lot", "Address", "Property Class", 
         "Square Footage", "Acreage", "Zoning District", "Year Built"
@@ -22,13 +21,21 @@ def fetch_property_data():
         writer = csv.writer(out_file)
         writer.writerow(headers)
 
-        # Read the monthly property queue
-        with open(INPUT_FILE, mode="r", encoding="utf-8") as in_file:
-            reader = csv.DictReader(in_file)
+        # 'utf-8-sig' safely handles invisible formatting characters from Excel/Windows
+        with open(INPUT_FILE, mode="r", encoding="utf-8-sig") as in_file:
+            reader = csv.reader(in_file)
             
             for row in reader:
-                block = row["block"].strip()
-                lot = row["lot"].strip()
+                # Skip completely empty rows
+                if not row or len(row) < 2:
+                    continue
+                
+                block = row[0].strip()
+                lot = row[1].strip()
+                
+                # Skip the header row if it exists in the CSV
+                if block.lower() == "block" or not block:
+                    continue
                 
                 url = f"https://njparcels.com/api/v1.0/property/{MUNICIPALITY_CODE}_{block}_{lot}.json"
                 print(f"Fetching Block {block}, Lot {lot}...")
@@ -39,7 +46,7 @@ def fetch_property_data():
                     if response.status_code == 200:
                         data = response.json()
                         
-                        # Handle potential structural variations in GeoJSON payloads
+                        # Handle potential structural variations in JSON payloads
                         if "properties" in data:
                             props = data["properties"]
                         elif "features" in data and len(data["features"]) > 0:
@@ -47,7 +54,7 @@ def fetch_property_data():
                         else:
                             props = data
                         
-                        # Extract data points mapping to target parameters
+                        # Extract metrics
                         address = props.get("address", props.get("addr1", "Unknown"))
                         prop_class = props.get("class", "Unknown")
                         sqft = props.get("sqft", props.get("inside_space", "Unknown"))
@@ -58,13 +65,13 @@ def fetch_property_data():
                         writer.writerow([block, lot, address, prop_class, sqft, acres, zoning, year_built])
                     else:
                         print(f"Skipped Block {block}, Lot {lot} (HTTP Status {response.status_code})")
-                        writer.writerow([block, lot, "API Unavailable", "", "", "", "", ""])
+                        writer.writerow([block, lot, f"API Error {response.status_code}", "", "", "", "", ""])
                         
                 except Exception as e:
                     print(f"Error parsing Block {block}, Lot {lot}: {e}")
                     writer.writerow([block, lot, "Error Parsing", "", "", "", "", ""])
                 
-                # Respect server limits with a standard rate delay
+                # Respect server rate limits
                 time.sleep(1.5)
 
 if __name__ == "__main__":
