@@ -4,7 +4,11 @@ on:
   push:
     paths:
       - 'properties.csv'
-  workflow_dispatch: # Allows you to click a button in GitHub to run it manually
+  workflow_dispatch:
+
+# This tells GitHub it is safe to let the script save files back to the repo
+permissions:
+  contents: write
 
 jobs:
   build-and-run:
