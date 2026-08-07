@@ -22,9 +22,13 @@ def combine_data():
     city_df['join_block'] = clean_id(city_df['Block'])
     city_df['join_lot'] = clean_id(city_df['Lot'])
     
-    # Regrid typically uses lowercase column headers
-    regrid_df['join_block'] = clean_id(regrid_df['block'])
-    regrid_df['join_lot'] = clean_id(regrid_df['lot'])
+    # Regrid typically uses lowercase column headers for block and lot
+    if 'block' in regrid_df.columns and 'lot' in regrid_df.columns:
+        regrid_df['join_block'] = clean_id(regrid_df['block'])
+        regrid_df['join_lot'] = clean_id(regrid_df['lot'])
+    else:
+        print("Error: Regrid file is missing 'block' and 'lot' columns.")
+        return
 
     # Perform a FULL OUTER JOIN to keep everything from both files
     master_df = pd.merge(
