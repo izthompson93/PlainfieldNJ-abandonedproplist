@@ -14,35 +14,33 @@ def combine_data():
         print("Missing one of the input files.")
         return
 
-    # Load both datasets
     city_df = pd.read_csv(CITY_FILE)
     regrid_df = pd.read_csv(REGRID_FILE, low_memory=False)
 
-    # Clean the Block and Lot columns in both files to create a unified matching key
-    city_df['join_block'] = clean_id(city_df['Block'])
-    city_df['join_lot'] = clean_id(city_df['Lot'])
-    
-    # Regrid typically uses lowercase column headers for block and lot
-    if 'block' in regrid_df.columns and 'lot' in regrid_df.columns:
-        regrid_df['join_block'] = clean_id(regrid_df['block'])
-        regrid_df['join_lot'] = clean_id(regrid_df['lot'])
-    else:
-        print("Error: Regrid file is missing 'block' and 'lot' columns.")
-        return
+    # 1. Rename the Regrid columns to perfectly match the City headers so they combine seamlessly
+    regrid_df = regrid_df.rename(columns={
+        'block': 'Block',
+        'lot': 'Lot',
+        'address': 'Address',
+        'owner': 'Owner Address',
+        'zoning': 'Zoning',
+        'saleprice': 'Last Sale Price',
+        'sqft': 'Square Footage',
+        'gisacre': 'Acreage',
+        'yearbuilt': 'Year Built'
+    })
 
-    # Perform a FULL OUTER JOIN to keep everything from both files
-    master_df = pd.merge(
-        city_df, 
-        regrid_df, 
-        on=['join_block', 'join_lot'], 
-        how='outer', 
-        suffixes=('_city', '_regrid')
-    )
+    # 2. Create the unified index key for both dataframes
+    city_df['join_idx'] = clean_id(city_df['Block']) + "_" + clean_id(city_df['Lot'])
+    regrid_df['join_idx'] = clean_id(regrid_df['Block']) + "_" + clean_id(regrid_df['Lot'])
 
-    # Drop the temporary join columns
-    master_df = master_df.drop(columns=['join_block', 'join_lot'])
+    city_df = city_df.set_index('join_idx')
+    regrid_df = regrid_df.set_index('join_idx')
 
-    # Save to a new master file
+    # 3. Combine them! This fills missing City data with Regrid data without creating duplicate columns.
+    master_df = city_df.combine_first(regrid_df).reset_index(drop=True)
+
+    # 4. Save to a new master file
     master_df.to_csv(OUTPUT_FILE, index=False)
     print("Successfully created master_combined_database.csv")
 
